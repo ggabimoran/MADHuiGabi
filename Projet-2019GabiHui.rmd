@@ -1,0 +1,326 @@
+---
+title: "Mélange de Bernoulli"
+author: "Jingzhuo HUI, Gabriel Moran"
+date: "24/10/2018"
+output: pdf_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Modèle
+
+Considérons un vecteur aléatoire binaire $\boldsymbol{x} \in [0,1]^p$ de $p$ variables $x_j$ suivant chacune
+une distribution de Bernoulli $\mathcal{B}(\mu_j)$. La distribution du vecteur s'exprime comme:
+$$
+p(\boldsymbol{x}| \boldsymbol{\mu}) = \prod_{j=1}^p \mu_j^{x_j} (1-\mu_j)^{1-x_j}, 
+$$
+avec $\boldsymbol{x}=(x_1, \cdots, x_p)^T$ et  $\boldsymbol{\mu}=(\mu_1, \cdots, \mu_p)^T$.
+
+Soit une distribution  mélange à $K$ composantes  de Bernoulli
+$$
+p(\boldsymbol{x} | \boldsymbol{\pi}, \boldsymbol{M}) = \sum_{k=1}^K
+                  \pi_k p(\boldsymbol{x} | \boldsymbol{\mu}_k)
+$$
+où les $\pi_k$ sont les proportions du mélange et les $p(\boldsymbol{x} | \boldsymbol{\mu}_k)$ sont des distributions de Bernoulli multivariées de
+paramètres  $\boldsymbol{\mu}_k=(\mu_{k1}, \cdots, \mu_{kp})^T$, et $M=\{\boldsymbol{\mu}_1, \cdots , \boldsymbol{\mu}_K\}^T$
+la matrice des paramètres des densités de classes.
+
+Dans la suite nous considérerons
+\begin{itemize}
+\item un échantillon observé $X = \{\boldsymbol{x}_1, \cdots, \boldsymbol{x}_n\}$ issu de cette distribution mélange, 
+\item des  variables latentes $Z=\{z_1, \cdots, z_n\}$ indiquant la composante d'origine de chaque $\boldsymbol{x}_i$.  
+\end{itemize}
+
+```{r , echo=FALSE,  warning=FALSE, error=FALSE, include=FALSE}
+library(tidyverse)
+library(reshape2)
+```
+  
+## Exercice 1
+
+Considérons un mélange à 3 composantes de Bernoulli mélangées en proportions égales $\pi_1 = \pi_2 = \pi_3$.
+
+Simulons une matrice $M$ de proportions dont les $3$ lignes et les $50$ colonnes décrivent $3$ vecteurs des proportions d'un mélange de Bernoulli dans un espace de dimension $50$.
+
+```{r}
+set.seed(3)
+K<-3
+p<-50
+n<-200
+pi<-c(1/3,1/3,1/3)
+M<-matrix(runif(K*p),K,p)
+M[K,]<-1-M[1,]
+```
+
+Simulons $Z=\{z_1, \cdots, z_n\}$ pour $n=200$.
+
+```{r}
+nks<-rmultinom(1,200,prob = pi)
+Z<-rep(1:length(nks),nks)
+```
+
+Simulons $X|Z$.
+
+```{r}
+X <-do.call(rbind, 
+                  mapply(function(nk,k){
+                    matrix(rbernoulli(nk*p,p=M[k,]),
+                           nrow = nk,
+                           ncol=p,
+                           byrow = TRUE)}, nks,1:K))
+```
+
+Permutons les lignes de la matrice $X$ à $200$ lignes et $50$ colonnes et visualisons la matrice ainsi obtenue.
+
+```{r}
+permutation <- sample(nrow(X))
+X <- X[permutation,]
+ggplot(melt(X), aes(x = Var2, y = Var1)) + 
+  geom_raster(aes(fill=value)) + 
+  scale_fill_brewer(aesthetics = "fill") + 
+  labs(x="Variables", y="Individus", title="Matrix")
+```
+
+On observe que l'échantillon a bien été mélangé et qu'il est impossible de distinguer graphiquement 3 motifs. On va désormais appliquer l'algorithme des kmeans à $X$ avec 3 classes.
+
+```{r}
+kmeans(X,3,nstart = 10)->res.kmeans
+```
+
+L'algorithme des kmeans convergeant vers un minimum local, on choisi nstart=10 initialisations différentes pour optimiser la réponse. L'algorithme des kmeans minimise l'inertie intra-classe et maximise l'inertie inter-classes. En assignant l'échantillon à $3$ classes au lieu d'une seule, la réduction de variance expliquée par les clusters vaut (en pourcentage):
+
+```{r}
+100*res.kmeans$tot.withinss/res.kmeans$totss
+```
+
+Visualisons la matrice classée :
+
+```{r}
+tidyData<-melt(X[order(res.kmeans$cluster),order(M[1,])])
+
+ggplot(tidyData, aes(x = Var2, y = Var1)) + 
+  geom_raster(aes(fill=value)) + 
+  scale_fill_brewer(aesthetics = "fill") + 
+  labs(x="Variables", y="Individus", title="Matrix") 
+```
+
+On observe bien les 3 motifs distincts.
+
+
+##Exercice 2
+
+Q1. Calculons la log-vraisemblance complète $\ln P(\mathbf{X},\mathbf{Z}|\boldsymbol{\theta}=\{\boldsymbol{\pi},\boldsymbol{M}\})$.
+
+Calculons d'abord la vraisemblance complète. On a :
+
+$P(\mathbf{X}, \mathbf{Z}| \mathbf{\pi}, \mathbf{M}) = P(\mathbf{X} | \mathbf{Z}, \mathbf{\pi}, \mathbf{M}) P(\mathbf{Z}| \mathbf{\pi}, \mathbf{M})$
+
+Or, les observations étant indépendantes, en notant $z_{i, k}=\mathbf{1}_{Z_i=k}$ : 
+$P(\mathbf{X}|\mathbf{Z}, \mathbf{\pi}, \mathbf{M}) = \prod_{i = 1}^n P(\mathbf{x_i}|\mathbf{z_i},\mathbf{\pi},\mathbf{M}) = \prod_{i = 1}^n \prod_{k = 1}^K P(\mathbf{x_i} | \mathbf{\mu_k})^{z_{i, k}} = \prod_{i = 1}^n \prod_{k = 1}^K \left( \prod_{j = 1}^p \mu_{k, j}^{x_{i, j}} (1 - \mu_{k, j})^{1 - x_{i, j}} \right)^{z_{i, k}}$
+
+Par ailleurs, comme $\pi_k=P(z_i=k)$,on a:
+$P(\mathbf{Z}|\mathbf{\pi}) = \prod_{i = 1}^n \,P(\mathbf{z_i}|\mathbf{\pi}) = \prod_{i = 1}^n \prod_{k = 1}^K \pi_k^{z_{i, k}}$
+
+On obtient donc pour la vraisemblance complète :
+
+$P(\mathbf{X}, \mathbf{Z}| \mathbf{\pi}, \mathbf{M}) = \prod_{i = 1}^n \prod_{k = 1}^K \left( \pi_k \prod_{j = 1}^p \mu_{k, j}^{x_{i, j}} (1 - \mu_{k, j})^{1 - x_{i, j}} \right)^{z_{i, k}}$
+
+En prenant le logarithme, cela donne :
+
+$\ln P(\mathbf{X}, \mathbf{Z}| \mathbf{\pi}, \mathbf{M}) = \sum_{i = 1}^n \sum_{k = 1}^K z_{i, k} \left( \ln \pi_k + \sum_{j = 1}^p x_{i, j} \ln \mu_{k, j} + (1 - x_{i, j}) \ln (1 - \mu_{k, j}) \right)$
+
+Q2. Calculons $t_{ik}^q=\mathbb{E}[z_{ik}]$ par rapport à la loi $p_{\theta^{q}}(\mathbf{Z}|\mathbf{X})$. On a, en utilisant le théorème de Bayes et le fait que $P(\mathbf{x_i}|z_{i,k})=P(\mathbf{x_i}|\mu_k)$ :
+
+$t_{ik}^q=\mathbb{E}[z_{i, k}] = P(z_{i,k} | \mathbf{x_i}, \mathbf{\pi}, \mathbf{M}) = \frac{P(z_{i,k}) P(\mathbf{x_i} |\mathbf{\mu_k})}{P(\mathbf{x_i})}$.
+
+Puis, par la formule des probabilités totales :
+
+$t_{i,k}^q= \frac{\pi_k P(\mathbf{x_i} |\mathbf{\mu_k})}{\sum_{m = 1}^K \pi_m P(\mathbf{x_i} | \mathbf{\mu_m})} = \frac{\pi_k \prod_{j = 1}^p \mu_{k, j}^{x_{i, j}} (1 - \mu_{k, j})^{1 - x_{i, j}} }{\sum_{m = 1}^K \pi_m \prod_{j = 1}^p \mu_{m, j}^{x_{i, j}} (1 - \mu_{m, j})^{1 - x_{i, j}}}$
+
+Q.3 On en déduit $Q(\theta^q|\theta)$, l'espérance de cette log-vraisemblance par rapport à la loi $p_{\theta^{q}}(\mathbf{Z}|\mathbf{X})$ :
+
+$Q(\theta^q|\theta)=\mathbb{E}[\ln P(\mathbf{X}, \mathbf{Z}| \mathbf{\pi}, \mathbf{M})] = \sum_{i = 1}^n \sum_{k = 1}^K t_{i,k}^q \left( \ln \pi_k + \sum_{j = 1}^p x_{i, j} \ln \mu_{k, j} + (1 - x_{i, j}) \ln (1 - \mu_{k, j}) \right)$
+
+Q.4 Pour déterminer $\theta^{q+1}=argmax_\theta Q(\theta^q|\theta)$
+
+
+###Q2 tqik = E[Zik] with respect to pÎ¸q(Z|X) where Zik = I(Zi=k).
+$$
+\begin{aligned}
+\mathbb{P}(x_i|Z_{ik}=1))=\mathbb{N}_p(x_i|\mu_k,\Sigma_k)&=\frac{1}{(2\pi)^{\frac{p}{2}}\times|\Sigma_k|^{\frac{1}{2}}}exp(-\frac{1}{2}(x_i-\mu_k)^T\Sigma_k^{-1}(x_i-\mu_k))
+\end{aligned}
+$$
+```{r , include=TRUE}
+mvpnorm<-function(x,mu,Sigma){
+  p<-length(x)
+   return( as.numeric(exp(-1/2*((x-mu)%*%solve(Sigma)%*%t(t(x-mu))))/det(Sigma)^(1/2)/(2*pi)^(p/2)))
+}
+mvpnorm(c(0,0), mu = c(0,0),Sigma = matrix(c(1,0,0,1),2,2))
+```
+
+
+###Q3 Express Q(Î¸q|Î¸) the expectation of the complete log-likelihood with respect to pÎ¸q (Z|X).
+
+$$
+\begin{aligned}
+Q(\theta^q|\theta)&=\mathbb{E}_{Z|x}[log\mathbb{P}_\theta(x,Z)|x,\theta^q]\\
+                  &=\mathbb{E}_{Z|x}[\sum_{i=1}^nlog \Pi_{k=1}^{K}\mathbb{P}(x_i,Z_{ik})^{Z_{ik}}]\\
+                  &=\mathbb{E}_{Z|x}[\sum_{i=1}^n\sum_{k=1}^{K}Z_{ik}log(\pi_k\times\mathbb{P}(x_i|Z_{ik}=1))]\\
+                  &=\sum_{i=1}^n\sum_{k=1}^{K}\mathbb{E}_{Z|x}[Z_{ik}=1,\theta^q]\times log(\pi_k\mathbb{P}(x_i|Z_{ik}=1))\\
+                  &=\sum_{i=1}^n\sum_{k=1}^{K}t_{ik}^q\times log(\pi_k\mathbb{P}(x_i|Z_{ik}=1))\\
+                  &=\sum_{i=1}^n\sum_{k=1}^{K}t_{ik}^q\times[log(\pi_k)-\frac{1}{2}(x_i-\mu_k)^T\Sigma_k^{-1}(x_i-\mu_k)-\frac{p}{2}log(2\pi)-\frac{1}{2}log(|\Sigma_k|)]
+\end{aligned}
+$$
+
+###Q4 Detail the computation of Î¸q+1 = argmaxÎ¸ Q(Î¸q|Î¸)
+
+$$
+\pi^{q+1}=argmax_{\pi^q}Q(\theta^q|\theta)
+$$
+
+$$
+=argmax_{\pi^q}\sum_{i=1}^n\sum_{k=1}^{K}t_{ik}^q\times log(\pi_k)
+$$
+$$
+\pi_j^{q+1}=\frac{1}{n}\sum_{i=1}^nt_{ij}^q
+$$
+          
+$$
+(\mu_j^{q+1},\Sigma_j^{q+1}) =argmax_{\mu_j^q,\Sigma_j^q}Q(\theta^q|\theta)   
+$$
+
+$$
+=argmax_{\mu_j^q,\Sigma_j^q}\sum_{i=1}^nt_{ij}^q\times[-\frac{1}{2}(x_i-\mu_j)^T\Sigma_j^{-1}(x_i-\mu_j)-\frac{1}{2}log(|\Sigma_j|)]
+$$
+
+$$
+\mu_j^{q+1}=\frac{ \sum_{i=1}^nt_{ij}^q \times x_i}{\sum_{i=1}^nt_{ij}^q}
+$$
+
+$$
+    \Sigma_j^{q+1}=\frac{ \sum_{i=1}^nt_{ij}^q \times (x_i-\mu_j^{q+1})^T(x_i-\mu_j^{q+1}) }{\sum_{i=1}^nt_{ij}^q}
+$$
+###Q5 EM algorithm for estimating Î¸
+Init:Create the $\theta$ randomly;
+Repeat:(for iteration small than the max iteration)
+    Compute the matrix T, compute the number Q;
+    Compute the new $\theta$ by the matrix T;
+    if $\Delta$Q small than $\xi$: break;
+For each observation of data, compute the probability of their belongs to every classes;
+Chose the class with the max probability;
+
+
+
+
+
+#E3
+###Q E-step
+```{r , include=TRUE}
+require("mvtnorm")
+library(mvtnorm)
+Estep<-function(X,pi,mu,sigma,K){
+ 
+  n<-nrow(X)
+  p<-ncol(X)
+  T<-matrix(0,ncol=K,nrow=n)
+   
+  for(i in 1:n){
+     sum<-0
+  for(l in 1:K){
+    sum=sum+pi[l]*dmvnorm(X[i,], mean = mu[,l],sigma = sigma[,l*p-p+1:p])
+  }
+    
+    for(k in 1:K){
+      T[i,k]=pi[k]*dmvnorm(X[i,], mean = mu[,k],sigma = sigma[,k*p-p+1:p])/sum
+      
+    }
+     
+  }
+  
+  Q<-0
+   for(i in 1:n){
+       for(k in 1:K){
+         Q=Q+T[i,k]*log(pi[k]*dmvnorm(X[i,], mean = mu[,k],sigma = sigma[,k*p-p+1:p]))
+       }
+   }
+  
+   result <- list(T=T, Q=Q) 
+  return(result) 
+}
+```
+
+###Q  M-step function
+```{r , include=TRUE}
+Mstep<-function(X,T,pi,mu,sigma,K){
+   p<-nrow(mu)
+   n<-nrow(T)
+  for(j in 1:K){
+    
+  sum<-0
+  for(i in 1:n){
+    sum=sum+T[i,j]
+  }
+    pi[j]=sum/n
+    
+    
+    sum1<-vector(length=ncol(X))
+     for(i in 1:n){
+    sum1=sum1+T[i,j]*X[i,]
+  }
+    mu[,j]=sum1/sum
+   sum2<-matrix(0,p,p)
+   for(i in 1:n){
+    sum2=sum2+T[i,j]*(t(X[i,]-t(mu[,j]))%*%(X[i,]-t(mu[,j])))
+   }
+   for(i in 1: p){
+     sigma[,j*p-p+i]=sum2[,i]/sum
+   }
+  }
+   result <- list(pi=pi, mu=mu,Sigma=sigma) 
+  return(result) 
+}
+```
+
+
+###EM mixture gaussien(juste pour voir un peu formule)
+```{r}
+mixt2.em <- function(y, p, mu, sigma, K)
+{
+  # initialization
+  like <- p[1]*dnorm(y,mu[1],sigma[1]) + p[2]*dnorm(y,mu[2],sigma[2])
+  deviance <- -2*sum(log(like))
+  res <- matrix(NA,K+1,8)
+  res[1,] <- c(0, p, mu, sigma, deviance)
+  for (k in 1:K) {
+    # E step
+    d1<-p[1]*dnorm(y,mu[1],sigma[1])
+    d2<-p[2]*dnorm(y,mu[2],sigma[2])
+    tau1 <-d1/(d1+d2)
+    tau2 <- 1-tau1
+    
+    # M step
+    p[1] <- mean(tau1)
+    mu[1] <- sum(tau1*y)/sum(tau1)
+    sigma[1] <-sqrt(sum(tau1*(y^2))/sum(tau1)-(mu[1])^2)
+    p[2] <- 1-p[1]
+    mu[2] <- sum((tau2)*y)/sum((tau2))
+    sigma[2] <-sqrt(sum(tau2*(y^2))/sum(tau2)-(mu[2])^2)
+    
+    # -2 x LL
+    like <- p[1]*dnorm(y,mu[1],sigma[1]) + p[2]*dnorm(y,mu[2],sigma[2])
+    deviance <- -2*sum(log(like))
+    
+    # add results to output
+    res[k+1,] <- c(k, p, mu, sigma, deviance)
+  }
+  res <- data.frame(res)
+  names(res) <- c("iteration","p1","p2","mu1","mu2","sigma1","sigma2","deviance")
+  out <- list(parameters=c(p, mu, sigma), deviance=deviance, res=res)
+  return(out)
+}
+
+```
+
+###5
+$$ BIC = kIn(n) - 2In(L)$$
