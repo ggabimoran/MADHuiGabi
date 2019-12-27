@@ -71,31 +71,31 @@ X <-do.call(rbind,
                            byrow = TRUE)}, nks,1:K))
 ```
 
-Permutons les lignes de la matrice $X$ à $200$ lignes et $50$ colonnes et visualisons la matrice ainsi obtenue. Procédons à la même permutation pour la matrice $Z$ des variables latentes.
+Permutons les lignes de la matrice $X$ à $200$ lignes et $50$ colonnes et visualisons la matrice ainsi obtenue. 
 
 ```{r}
 permutation <- sample(nrow(X))
 X <- X[permutation,]
-Z_kmeans<-matrix(0,nrow=n,ncol=K)
-for (j in 1:K){
-  Z_kmeans[res.kmeans$cluster==j,j]<-1
-}
 ggplot(melt(X), aes(x = Var2, y = Var1)) + 
   geom_raster(aes(fill=value)) + 
   scale_fill_brewer(aesthetics = "fill") + 
   labs(x="Variables", y="Individus", title="Matrix")
 ```
 
-On observe que l'échantillon a bien été mélangé et qu'il est impossible de distinguer graphiquement 3 motifs. On va désormais appliquer l'algorithme des kmeans à $X$ avec 3 classes.
+On observe que l'échantillon a bien été mélangé et qu'il est impossible de distinguer graphiquement 3 motifs. On va désormais appliquer l'algorithme des kmeans à $X$ avec 3 classes et produire la matrice $Z$ des variables latentes correspondantes.
 
 ```{r}
 kmeans(X,3,nstart = 10)->res.kmeans
+Z_kmeans<-matrix(0,nrow=n,ncol=K)
+for (j in 1:K){
+  Z_kmeans[res.kmeans$cluster==j,j]<-1
+}
 ```
 
 On remarque déjà que la taille des clusters obtenues correspond bien celles des composantes de notre mélange de Bernoulli (donnée par nks) :
 
 ```{r}
-t(nks)
+c(nks)
 res.kmeans$size
 ```
 
@@ -197,7 +197,7 @@ E_Step<-function(X_,M_,pi_){
 
 Nous voulons vérifier les résultats en injectant les vrais paramètres de notre simulation et en comparant les $t_{i,k}$ estimé par rapport aux variables latentes Z de notre simulation (ce qui correspond à notre Z_kmeans). Si contrairement aux variables latentes $z_1,..,z_n$, les $t_i$ ne sont pas des variables binaires, on s'attend à avoir le même maximum de responsabilité pour chaque $x_i$, $i \in \{1,..,n\}$. On peut donc montrer dans un premier temps que les $t_i$ et $z_i$ ont le même maximum de responsabilité, puis, dans un second temps, on peut comparer la norme de la différence des deux matrices (qui doit être "proche", au sens de la norme matricielle, de la matrice nulle). Or, on ne sait pas dans quel ordre l'algorithme kmeans numérote les clusters et donc si les numérotations des composantes et des clusters correspondent. On va donc devoir comparer pour chaque permutation de la numérotation des clusters. Dès que tout les $t_i$ et $z_i$ ont le même maximum de responsabilité, on sait que l'on aura obtenu la bonne numérotation.
 
-```{r}
+```{r,warning=FALSE}
 T<-E_Step(X,M,pi)
 Tmax<-apply(T,which.max,MARGIN = 1)
 library(combinat)
@@ -209,7 +209,7 @@ for (i in 1:K){
   }
   if(sum(copycluster==Tmax)==n){
     print("Mêmes maximums de responsabilité pour tout x_i")
-    print("Norme de la différence des matrices Z et T")
+    print("Norme de la différence des matrices Z et T:")
     print(norm(T[,cluster_permutations[[i]]]-Z_kmeans))
     break;
   }
@@ -229,12 +229,26 @@ où $n_k=\sum_{i = 1}^n t_{i,k}^q$
 M_Step<-function(X_,T_){
   #Calcul des mu_k
   new_mu <- matrix(1:K,ncol = 1)
-  new_mu <- t(apply(new_mut,MARGIN=1,function(k){colSums(t(t(X)*c(T[,k])))/colSums(T)[k]}))
+  new_mu <- t(apply(new_mu,MARGIN=1,function(k){colSums(X_*c(T_[,k]))/colSums(T_)[k]}))
   #Calcul des pi_k
   new_pi <- colSums(T_)/n
+  return (list("new_pi"=new_pi,"new_mu"=new_mu))
 }
 ```
 
+De manière analogue à la question précédente, on peut tester la fonction sur notre simulation dont on connait tous les paramètres et calculer les normes des différences pour voir si elles approchent la matrice nulle : 
+
+```{r}
+new_theta <- M_Step(X,T)
+print("Norme de la différence des matrices M et new_mu:")
+print(norm(M-new_theta$new_mu))
+print("Norme de la différence des matrices pi et new_pi:")
+print(norm(pi-new_theta$new_pi))
+```
+
+On obtient des normes proches de 0, ce qui est cohérent.
+
+Q.3
 
 
 
