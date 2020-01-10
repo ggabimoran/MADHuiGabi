@@ -2,6 +2,9 @@
 title: "Mélange de Bernoulli"
 author: "Jingzhuo HUI, Gabriel Moran"
 date: "24/10/2018"
+header-includes:
+   - \usepackage{algorithm}
+   - \usepackage{algorithmic}
 output: pdf_document
 ---
 ```{r setup, include=FALSE}
@@ -135,7 +138,7 @@ $P(\mathbf{Z}|\mathbf{\pi}) = \prod_{i = 1}^n \,P(\mathbf{z_i}|\mathbf{\pi}) = \
 
 On obtient donc pour la vraisemblance complète :
 
-$P(\mathbf{X}, \mathbf{Z}| \mathbf{\pi}, \mathbf{M}) = \prod_{i = 1}^n \prod_{k = 1}^K \left( \pi_k \prod_{j = 1}^p \mu_{k, j}^{x_{i, j}} (1 - \mu_{k, j})^{1 - x_{i, j}} \right)^{z_{i, k}}$
+$\log P(\mathbf{X}, \mathbf{Z}| \mathbf{\pi}, \mathbf{M}) = \prod_{i = 1}^n \prod_{k = 1}^K \left( \pi_k \prod_{j = 1}^p \mu_{k, j}^{x_{i, j}} (1 - \mu_{k, j})^{1 - x_{i, j}} \right)^{z_{i, k}}$
 
 En prenant le logarithme, cela donne :
 
@@ -151,7 +154,7 @@ $$t_{i,k}^q= \frac{\pi_k P(\mathbf{x_i} |\mathbf{\mu_k})}{\sum_{m = 1}^K \pi_m P
 
 Q.3 On en déduit $Q(\theta^q|\theta)$, l'espérance de cette log-vraisemblance par rapport à la loi $p_{\theta^{q}}(\mathbf{Z}|\mathbf{X})$ :
 
-$Q(\theta^q|\theta)=\mathbb{E}[\ln P(\mathbf{X}, \mathbf{Z}| \mathbf{\pi}, \mathbf{M})] = \sum_{i = 1}^n \sum_{k = 1}^K t_{i,k}^q \left( \ln \pi_k + \sum_{j = 1}^p x_{i, j} \ln \mu_{k, j} + (1 - x_{i, j}) \ln (1 - \mu_{k, j}) \right)$
+$Q(\theta^q|\theta)=\mathbb{E}_{Z|X,\theta^q}[\ln P(\mathbf{X}, \mathbf{Z}| \mathbf{\pi}, \mathbf{M})] = \sum_{i = 1}^n \sum_{k = 1}^K t_{i,k}^q \left( \ln \pi_k + \sum_{j = 1}^p x_{i, j} \ln \mu_{k, j} + (1 - x_{i, j}) \ln (1 - \mu_{k, j}) \right)$
 
 Q.4 Pour déterminer $\theta^{q+1}=argmax_\theta Q(\theta^q|\theta)$, on peut commencer par maximiser l'argument par rapport à $\boldsymbol{\mu}_k$ en annulant sa dérivée :
 
@@ -159,35 +162,124 @@ $\frac{\partial}{\partial \mu_{k, j}} Q(\theta^q|\theta) = \sum_{i = 1}^n t_{i,k
 
 où $n_k=\sum_{i = 1}^n t_{i,k}^q$ correspond au nombre de points affectés au cluster $k$. Ainsi, pour $k \in \{1,...K\}$, le maximum de $Q(\theta^q|\theta)$ par rapport à $\boldsymbol{\mu}_k$ est :
 
-$$\boldsymbol{\mu}_k=\frac{1}{n_k} \sum_{i = 1}^n \boldsymbol{x}_i t_{i,k}^q$$
+$$\boldsymbol{\mu}_k^{q+1}=\frac{1}{n_k} \sum_{i = 1}^n \boldsymbol{x}_i t_{i,k}^q$$
 
 Pour maximiser la fonction $Q(\theta^q|\theta)$ par rapport à $\pi$, sous la contrainte $\sum_{k=1}^K \pi_k=1$, on peut introduire le multiplicateur de Lagrange. Le problème d'optimisation devient alors de maximiser la fonction $\Lambda(\theta,\lambda)= Q(\theta^q|\theta)+\lambda (\sum_{k=1}^K \pi_k - 1)$. En dérivant succéssivement par rapport à $\pi_k$ puis $\lambda$, on obtient : 
 $\frac{\partial}{\partial \pi_{k}} \Lambda(\theta, \lambda) = \frac{1}{\pi_k} \sum_{i = 1}^n t_{i,k}^q + \lambda = 0 \Leftrightarrow \pi_k = -\frac{n_k}{\lambda}$,
 
 $\frac{\partial}{\partial \lambda} \Lambda(\theta, \lambda) = \sum_{k = 1}^K \pi_k - 1 = 0 \Leftrightarrow \sum_{k = 1}^K \pi_k = 1$.
 
-En combinant ces deux résultats, on obtient $\lambda = - \sum_{k = 1}^K n_k = - n$ et donc : $$\pi_k = -\frac{n_k}{\lambda} = \frac{n_k}{n}$$
+En combinant ces deux résultats, on obtient $\lambda = - \sum_{k = 1}^K n_k = - n$ et donc : $$\pi_k^{q+1} = -\frac{n_k}{\lambda} = \frac{n_k}{n}$$
 
-Q.5 On commence l'algorithme EM en initialisant $\theta$. Ensuite, l'étape E de l'algorithme EM consiste à calculer les $t_{i,k}^q=\mathbb{E}[z_{ik}]$ pour mettre à jour la distribution des variables latentes $z_i$. Puis l'étape M consiste à affecter à $\theta$ le maximum de $Q(\theta^q|\theta)=\mathbb{E}[\ln P(\mathbf{X}, \mathbf{Z}| \mathbf{\pi}, \mathbf{M})]$ par rapport à $\theta$. Le $\theta$ estimé est obtenu lors de la convergence.
+Q.5 On commence l'algorithme EM en initialisant $\theta$. Ensuite, l'étape E de l'algorithme EM consiste à calculer les $t_{i,k}^q=\mathbb{E}[z_{ik}]$ pour mettre à jour la distribution des variables latentes $z_i$. Puis l'étape M consiste à affecter à $\theta$ le maximum de $Q(\theta^q|\theta)=\mathbb{E}[\ln P(\mathbf{X}, \mathbf{Z}| \mathbf{\pi}, \mathbf{M})]$ par rapport à $\theta$. Le $\theta$ estimé est obtenu lors de la convergence de la log-vraisemblance.
 
-Q.6
+Q.6 On veut calculer $-\mathbb{E}[\ln p_{\theta^{q+1}}[Z|X]]$ par rapport à la loi $p_{\theta^{q+1}}[Z|X]$. On a :
+
+$-\mathbb{E}[\ln p_{\theta^{q+1}}[Z|X]] = -\sum_{i=1}^n \mathbb{E}[\ln p_{\theta^{q+1}}[\mathbf{z}_i|\mathbf{x}_i]] = -\sum_{i=1}^n \mathbb{E}[\ln \prod_{k=1}^K p_{\theta^{q+1}} [\mathbf{z}_{i,k}|\mathbf{x}_i]^{z_{i,k}}] = -\sum_{i=1}^n \sum_{k=1}^K t_{i,k}^{q+1} \ln t_{i,k}^{q+1}$
+
+Q.7 La forme de la log-vraisemblance $\ln p_{\hat \theta}[\mathbf{X}|\theta = \{\pi,\mathbf{M} \}]$ pour le paramètre $\hat{\theta}$ estimé est :
+
+$$\ln p_{\hat \theta}[\mathbf{X}|\theta = \{\pi,\mathbf{M} \}]=\sum_{i=1}^n \ln p_{\hat \theta}[\mathbf{x_i}|\theta = \{\pi,\mathbf{M} \}]=\sum_{i=1}^n \ln (\sum_{k=1}^K \hat{\pi}_k P(\mathbf{x_i | \hat{\mu}_k}))$$
+
+avec $P(\mathbf{x_i | \hat{\mu}_k})=\prod_{j=1}^p \hat{\mu}_{k,j}^{x_{i,j}} (1-\hat{\mu}_{k,j})^{(1-x_{i,j})}$
+
+Q.8 Le critère BIC correspond à $-2 \times \max logvraisemblance + v_K \ln n$
+
+où $v_K$ est le nombre de paramètres libres dans le modèle à $K$ composantes. Le premier terme est donné par la question précédente et $v_K=K(p+1)$, car il a $Kp$ paramètres $\mu_{k,j}$ et $K$ paramètres $\pi_k$. Ainsi : le critère BIC associé à un modèle à $K$ classes s'écrit :
+$$BIC=-2 \sum_{i=1}^n \ln (\sum_{k=1}^K \hat{\pi}_k P(\mathbf{x_i | \hat{\mu}_k})) + K(p+1) \ln n$$
+avec $P(\mathbf{x_i | \hat{\mu}_k})=\prod_{j=1}^p \hat{\mu}_{k,j}^{x_{i,j}} (1-\hat{\mu}_{k,j})^{(1-x_{i,j})}$
+
+9. Le critère ICL correspond à $-2 \times logvraisemblancecomplète - \frac{v_K}{2} \ln n$
+où la log-vraisemblance complète est calculée pour $\hat{\theta}$ maximisant la log-vraisemblance, en remplaçant $\mathbf{Z}$ par $\mathbf{\tilde{Z}}=MAP(\hat{\theta})$ le maximum a posteriori de $\hat{\theta}$. Or, on a aussi pour que le critère ICL est égal au critère BIC pénalisé par le terme $-\sum_{i=1}^n \sum_{k=1}^K t_{i,k} \ln t_{i,k}$ ce qui correspond au terme calculé à la question $6$ au moment de la convergence. Ainsi :
+$$ICL=-2 \sum_{i=1}^n \ln (\sum_{k=1}^K \hat{\pi}_k P(\mathbf{x_i | \hat{\mu}_k})) + K(p+1) \ln n -\sum_{i=1}^n \sum_{k=1}^K t_{i,k} \ln t_{i,k}$$
+
+
+10. La convergence de l'algorithme EM est définie dès lors que la différence en valeur absolue de la log-vraisemblance entre deux itérations consécutives est inférieure à un certain $\epsilon$ assez petit. Ainsi, l'algorithme EM d'estimation des paramètres du modèle de mélange de Bernoulli est :
+
+
+\begin{algorithm}
+
+\caption{Calculate $\hat{\theta}$}
+
+\begin{algorithmic}
+
+\ENSURE $\theta = \hat{\theta}$
+\STATE Initialisation au hasard de $\theta^0$
+\STATE $q \leftarrow 0$
+\STATE $L_0 \leftarrow \sum_{i=1}^n \ln (\sum_{k=1}^K \pi_k^0 P(\mathbf{x_i | \mu_k^0}))$
+\STATE $\epsilon \leftarrow 10^{-3}$
+
+\REPEAT
+\STATE $t_{i,k}^q \leftarrow \frac{\pi_k \prod_{j = 1}^p \mu_{k, j}^{x_{i, j}} (1 - \mu_{k, j})^{1 - x_{i, j}} }{\sum_{m = 1}^K \pi_m \prod_{j = 1}^p \mu_{m, j}^{x_{i, j}} (1 - \mu_{m, j})^{1 - x_{i, j}}}$
+\STATE $n_k \leftarrow \sum_{i = 1}^n t_{i,k}^q$
+\STATE $\boldsymbol{\mu}_k^{q+1} \leftarrow \frac{1}{n_k} \sum_{i = 1}^n \boldsymbol{x}_i t_{i,k}^q$
+\STATE $\pi_k^{q+1} \leftarrow \frac{n_k}{n}$
+\STATE $\theta^{q+1} \leftarrow \{\pi_k^{q+1}, \boldsymbol{\mu}_k^{q+1} \}$
+\STATE $L_{q+1} \leftarrow \sum_{i=1}^n \ln (\sum_{k=1}^K \pi_k^{q+1} P(\mathbf{x_i | \mu}_k^{q+1}))$
+\STATE $q \leftarrow q+1$
+\UNTIL{$| L_{q} - L_{q-1}| \leq \epsilon$}
+
+\end{algorithmic}
+
+\end{algorithm}
+
+\newpage
+
+11. L'algorithme EM consiste à maximiser la vraisemblance du paramètre $\theta$. L'algorithme CEM consiste à optimiser, non pas la vraisemblance du paramètre, mais la vraisemblance complète. On rappelle que $\ln P(\mathbf{X}, \mathbf{Z}| \mathbf{\pi}, \mathbf{M}) = \sum_{i = 1}^n \sum_{k = 1}^K z_{i, k} \left( \ln \pi_k + \sum_{j = 1}^p x_{i, j} \ln \mu_{k, j} + (1 - x_{i, j}) \ln (1 - \mu_{k, j}) \right)$. A chaque étape de l'algorithme CEM, on maximise la log-vraisemblance complète en fonction de $\mathbf{Z}$ puis $\theta$. Comme $z_{i,k} \in \{0,1\}$, on obtient $z_{i,k}^{q+1}=\sum_{i = 1}^n \max_{k} \left( \ln \pi_k + \sum_{j = 1}^p x_{i, j} \ln \mu_{k, j} + (1 - x_{i, j}) \ln (1 - \mu_{k, j}) \right)$. Puis, par un calcul analogue à celui fait question $4$, on a pour la forme de $\theta^{q+1}$ :
+$\boldsymbol{\mu}_k^{q+1}=\frac{1}{n_k} \sum_{i = 1}^n \boldsymbol{x}_i z_{i,k}^{q+1}$
+et 
+$\pi_k^{q+1}=\frac{n_k}{n}$
+avec $n_k = \sum_{i = 1}^n z_{i,k}^{q+1}$
+
+La convergence de l'algorithme CEM est définie dès lors que la différence en valeur absolue de la log-vraisemblance complète entre deux itérations consécutives est inférieure à un certain $\epsilon$ assez petit. L'algorithme CEM associé au même mélange est :
+
+\begin{algorithm}
+
+\caption{Calculate $\hat{\theta},\hat{Z}$}
+
+\begin{algorithmic}
+
+\ENSURE $\theta = \hat{\theta}, Z = \hat{Z}$
+\STATE Initialisation au hasard de $\theta^0$
+\STATE Initialisation au hasard de $\mathbf{Z}^0$
+\STATE $q \leftarrow 0$
+\STATE $L_0 \leftarrow \sum_{i = 1}^n \sum_{k = 1}^K z_{i, k}^0 \left( \ln \pi_k^0 + \sum_{j = 1}^p x_{i, j} \ln \mu_{k, j}^0 + (1 - x_{i, j}) \ln (1 - \mu_{k, j}^0) \right)$
+\STATE $\epsilon \leftarrow 10^{-3}$
+
+\REPEAT
+\STATE $z_{i,k}^{q+1} \leftarrow \sum_{i = 1}^n \max_{k} \left( \ln \pi_k + \sum_{j = 1}^p x_{i, j} \ln \mu_{k, j} + (1 - x_{i, j}) \ln (1 - \mu_{k, j}) \right)$
+\STATE $n_k \leftarrow \sum_{i = 1}^n z_{i,k}^{q+1}$
+\STATE $\boldsymbol{\mu}_k^{q+1} \leftarrow \frac{1}{n_k} \sum_{i = 1}^n \boldsymbol{x}_i z_{i,k}^{q+1}$
+\STATE $\pi_k^{q+1} \leftarrow \frac{n_k}{n}$
+\STATE $\theta^{q+1} \leftarrow \{\pi_k^{q+1}, \boldsymbol{\mu}_k^{q+1} \}$
+\STATE $L_{q+1} \leftarrow \sum_{i = 1}^n \sum_{k = 1}^K z_{i, k}^{q+1} \left( \ln \pi_k^{q+1} + \sum_{j = 1}^p x_{i, j} \ln \mu_{k, j}^{q+1} + (1 - x_{i, j}) \ln (1 - \mu_{k, j}^{q+1}) \right)$
+\STATE $q\leftarrow q+1$
+\UNTIL{$| L_q - L_{q-1} | \leq \epsilon$}
+
+\end{algorithmic}
+
+\end{algorithm}
+
+\newpage
 
 ##Exercice 3
 
 Q.1 Ecrivons une fonction E-step qui produit les $t_{i,k}$ à partir de $\Theta$.
 ```{r}
 E_Step<-function(X_,M_,pi_){
+  n_ <- nrow(X_)
+  K_ <- nrow(M_)
   #Calcul de P(X|M)
-  p_x_mu <- matrix(0,nrow=n,ncol=K)
-  for (i in 1:n){
-    for (k in 1:K){
+  p_x_mu <- matrix(0,nrow=n_,ncol=K_)
+  for (i in 1:n_){
+    for (k in 1:K_){
       p_x_mu[i,k]<-prod(M_[k,]^X_[i,]*(1-M_[k,])^(1-X_[i,]))
     }
   }
   #Calcul de T la matrice des t_i,k
-  T<-matrix(0,nrow=n,ncol = K)
-  for (i in 1:n){
-    for (k in 1:K){
+  T<-matrix(0,nrow=n_,ncol = K_)
+  for (i in 1:n_){
+    for (k in 1:K_){
       T[i,k]<-pi_[k]*p_x_mu[i,k]/(t(pi_)%*%p_x_mu[i,])
     }
   }
@@ -197,7 +289,7 @@ E_Step<-function(X_,M_,pi_){
 
 Nous voulons vérifier les résultats en injectant les vrais paramètres de notre simulation et en comparant les $t_{i,k}$ estimé par rapport aux variables latentes Z de notre simulation (ce qui correspond à notre Z_kmeans). Si contrairement aux variables latentes $z_1,..,z_n$, les $t_i$ ne sont pas des variables binaires, on s'attend à avoir le même maximum de responsabilité pour chaque $x_i$, $i \in \{1,..,n\}$. On peut donc montrer dans un premier temps que les $t_i$ et $z_i$ ont le même maximum de responsabilité, puis, dans un second temps, on peut comparer la norme de la différence des deux matrices (qui doit être "proche", au sens de la norme matricielle, de la matrice nulle). Or, on ne sait pas dans quel ordre l'algorithme kmeans numérote les clusters et donc si les numérotations des composantes et des clusters correspondent. On va donc devoir comparer pour chaque permutation de la numérotation des clusters. Dès que tout les $t_i$ et $z_i$ ont le même maximum de responsabilité, on sait que l'on aura obtenu la bonne numérotation.
 
-```{r,warning=FALSE}
+```{r,warning=FALSE,error=FALSE}
 T<-E_Step(X,M,pi)
 Tmax<-apply(T,which.max,MARGIN = 1)
 library(combinat)
@@ -227,19 +319,22 @@ où $n_k=\sum_{i = 1}^n t_{i,k}^q$
 
 ```{r}
 M_Step<-function(X_,T_){
+  K_<-ncol(T_)
+  n_<-nrow(X_)
   #Calcul des mu_k
-  new_mu <- matrix(1:K,ncol = 1)
+  new_mu <- matrix(1:K_,ncol = 1)
   new_mu <- t(apply(new_mu,MARGIN=1,function(k){colSums(X_*c(T_[,k]))/colSums(T_)[k]}))
   #Calcul des pi_k
-  new_pi <- colSums(T_)/n
+  new_pi <- colSums(T_)/n_
   return (list("new_pi"=new_pi,"new_mu"=new_mu))
 }
 ```
 
 De manière analogue à la question précédente, on peut tester la fonction sur notre simulation dont on connait tous les paramètres et calculer les normes des différences pour voir si elles approchent la matrice nulle : 
-
 ```{r}
 new_theta <- M_Step(X,T)
+```
+```{r,echo=FALSE}
 print("Norme de la différence des matrices M et new_mu:")
 print(norm(M-new_theta$new_mu))
 print("Norme de la différence des matrices pi et new_pi:")
@@ -248,7 +343,106 @@ print(norm(pi-new_theta$new_pi))
 
 On obtient des normes proches de 0, ce qui est cohérent.
 
-Q.3
+Q.3 Ecrivons l'algorithme EM qui estime les paramètres d'un mélange à $K$ classes. 
+
+```{r}
+EM <- function(X_,K_){
+  n_ <- nrow(X_)
+  p_ <- ncol(X_)
+  M_<-matrix(runif(K_*p_),nrow=K_,ncol=p_)
+  pi_<-matrix(runif(K_),nrow=K_)
+  epsilon <- 10^-3
+  L_prev <- loglikelihood(X_,pi_,M_)
+  loglik_evolution <- c()
+  repeat{
+    #Expectation
+    T_<-E_Step(X_,M_,pi_)
+    L_semi <- loglikelihood(X_,pi_,M_)
+    loglik_evolution <- c(loglik_evolution,L_semi)
+    #Maximisation
+    new_theta <- M_Step(X_,T_)
+    M_ <- new_theta$new_mu
+    pi_ <- new_theta$new_pi
+    L_curr <- loglikelihood(X_,pi_,M_)
+    loglik_evolution <- c(loglik_evolution,L_curr)
+    #convergence criterion
+    if (abs(L_curr - L_prev)<=epsilon){
+      break;
+    }
+    L_prev<-L_curr
+  }
+  return (list("pi_hat"=pi_,"M_hat"=M_,"maxloglik"=L_curr,"loglik_evol"=loglik_evolution,"T_final"=T_))
+}
+
+loglikelihood <- function(X_,pi_,M_){
+  n_<-nrow(X_)
+  p_<-ncol(X_)
+  K_<-nrow(M_)
+  #P_ matrice des p(x_i|mu_k)
+  P_<-matrix(0,nrow = K_,ncol = n_)
+  for (k in 1:K_){
+    for (i in 1:n_){
+      product<-1
+      for (j in 1:p_){
+        product <- product * (M_[k,j]^X_[i,j] * (1-M_[k,j])^(1-X_[i,j]))
+      }
+      P_[k,i]<-product
+    }
+  }
+  res<-0
+  for (i in 1:n){
+    res <- res + log(t(pi_)%*%P_[,i])
+  }
+  return (res)
+}
+```
+
+Q.4 Traçons l'évolution de la log-vraisemblance à chaque demi étape (E et M) lorsqu'on applique l'algorithme aux données simulées :
+
+```{r}
+em_res <- EM(X,3)
+plot(em_res$loglik_evol)
+```
+
+On observe que la log-vraisemblance croît à chaque étape, ce qui est cohérent. Par ailleurs, on observe que la log-vraisemblance ne change pas entre avant et après l'étape "expectation", ce qui est cohérent.
+
+Q.5 Programmons la fonction BIC :
+
+```{r}
+myBIC <- function(EM_res_){
+  K_ <- nrow(EM_res_$M_hat)
+  p_ <- ncol(EM_res_$M_hat)
+  n_ <- nrow(EM_res_$T_final)
+  return (-2 * EM_res_$maxloglik +K_*(p_+1)*log(n_))
+}
+myBIC(em_res)
+```
+
+Q.6 Programmons la fonction IC : 
+
+```{r}
+myICL <- function(EM_res_){
+  penalization <- sum(EM_res_$T_final * apply(EM_res_$T_final,FUN = log,MARGIN=c(1,2)),na.rm = TRUE)
+  return (myBIC(EM_res_) - penalization)
+}
+myICL(em_res)
+```
+
+Comme $x\ln x \rightarrow_{x \rightarrow 0} 0$ et que certains des $t_{i,k}$ estimés par l'algorithme EM sont numériquements égaux à 0, on peut ignorer les valeur NaN dans la somme des $t_{i,k} \ln t_{i,k}$ (correspondant au résultat de 0 * -Inf). 
+
+##Exercice 4
+
+On charge les données.
+
+```{r}
+state_firearms <- read.table("raw_data.csv",sep = ",",header = TRUE)
+```
+
+Eliminons les variables non-binaires
+
+```{r}
+state_firearms_data <- as.matrix(state_firearms[,-c(1,2,136)])
+```
 
 
 
