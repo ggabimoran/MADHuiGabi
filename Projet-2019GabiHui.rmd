@@ -390,7 +390,7 @@ loglikelihood <- function(X_,pi_,M_){
     }
   }
   res<-0
-  for (i in 1:n){
+  for (i in 1:n_){
     res <- res + log(t(pi_)%*%P_[,i])
   }
   return (res)
@@ -444,9 +444,49 @@ Eliminons les variables non-binaires
 state_firearms_data <- as.matrix(state_firearms[,-c(1,2,136)])
 ```
 
+Le problème est désormais d'évaluer le nombre de composantes $K$. Le critère BIC limite l'overfitting avec le terme $K(p+1) \ln n$. Cependant, en calculant le maximum de la log-vraisemblance, le critère BIC se positionne dans une optique d'estimation, sans considération de la classification faite a posteriori. En revanche, le critère ICL, qui calcule la log-vraisemblance complète, optimise le partionnement des données. On peut donc traçer l'évolution des critères ICL et BIC en fonction du nombre de composantes. Le plus faible sont chacun de ces critères, le mieux est la capacité prédictive du modèle. En l'absence de minimum, on peut déterminer la grande variation de la somme cumulée. 
+
+Appliquons l'algorithme au jeu de données sur les lignes pour $K$ composantes, $K \in \{1,..,5\}$ :
+
+{r}
+bic_evol <- c()
+icl_evol <- c()
+for (i in 1:5){
+  sf_em_res <- EM(state_firearms_data,i)
+  bic_evol <- c(bic_evol,myBIC(sf_em_res))
+  icl_evol <- c(icl_evol,myICL(sf_em_res))
+}
+
+
+Affichons l'évolution des critères BIC et ICL en fonction du nombre de composantes.
+
+{r}
+plot(bic_evol)
+plot(icl_evol)
+
+Appliquons l'algorithme au jeu de données sur les lignes pour $K$ composantes, $K \in \{1,..,5\}$ :
+
+{r}
+tbic_evol <- c()
+ticl_evol <- c()
+for (i in 1:5){
+  tsf_em_res <- EM(matrix(state_firearms_data,nrow=133,ncol=1350),i)
+  tbic_evol <- c(tbic_evol,myBIC(tsf_em_res))
+  ticl_evol <- c(ticl_evol,myICL(tsf_em_res))
+}
+
+
+Affichons l'évolution des critères BIC et ICL en fonction du nombre de composantes.
+
+{r}
+plot(tbic_evol)
+plot(ticl_evol)
 
 
 
+NOTE : En raison d'un temps de compilation trop important pour l'ordinateur sur lequel la version finale du projet a été compilée, le code ci-dessus a été mis en commentaire. 
+
+Sur un ordinateur plus performant, on obtient pour l'algorithme appliqué sur les lignes un critère BIC et ICL minimal pour $K=2$. On peut émettre l'hypothèse que cette valeur optimale du nombre de composantes $K=2$ pour le partitionnement des données fait transparaître le clivage entre états traditionnellemnt républicains (régulation sur les armes plus libérale) et démocrates (régulation sur les armes plus réstrictive).
 
 
 
